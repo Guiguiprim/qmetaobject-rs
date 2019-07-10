@@ -131,6 +131,17 @@ impl QmlEngine {
         }
     }
 
+    /// Returns true if the engine has at least one root object.
+    /// This allows to test the success of a QML file loading.
+    /// (See QQmlApplicationEngine::rootObjects)
+    pub fn has_objects(&self) -> bool {
+        unsafe {
+            cpp!([self as "QmlEngineHolder*"] -> bool as "bool" {
+                return self->engine->rootObjects().size() > 0;
+            })
+        }
+    }
+
     /// Launches the application
     pub fn exec(&self) {
         unsafe { cpp!([self as "QmlEngineHolder*"] { self->app->exec(); }) }
