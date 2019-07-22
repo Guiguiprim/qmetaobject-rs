@@ -17,23 +17,13 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 use super::*;
 
-fn register_metatype_common<T: QMetaType>(
-    name: *const std::os::raw::c_char,
-    metaobject: *const QMetaObject,
-    is_enum: bool,
-) -> i32 {
-    use std::any::TypeId;
-    use std::collections::{HashMap, HashSet};
-    use std::ffi::{CStr, CString};
-    use std::sync::Mutex;
-
-    lazy_static! {
-        static ref HASHMAP: Mutex<HashMap<TypeId, (i32, HashSet<CString>)>> =
-            Mutex::new(HashMap::new());
-    };
-
-    let mut h = HASHMAP.lock().unwrap_or_else(|e| e.into_inner());
-    let e = h.entry(TypeId::of::<T>()).or_insert_with(|| {
+mod helper {
+    use super::*;
+    pub fn regiter_type_enum<T: Default + Clone>(
+        metaobject: *const QMetaObject,
+        name: std::ffi::CString,
+        is_enum: bool,
+    ) -> i32 {
         let size = std::mem::size_of::<T>() as u32;
 
         extern "C" fn deleter_fn<T>(v: *mut T) { unsafe { Box::from_raw(v); } };
@@ -68,7 +58,6 @@ fn register_metatype_common<T: QMetaType>(
         };
         let constructor_fn: extern "C" fn(ptr: *mut T, c: *const T) -> *mut T = constructor_fn;
 
-        let name = CString::new(format!("{:?}", TypeId::of::<T>())).unwrap();
         let name = name.as_ptr();
         let type_id = cpp!(unsafe [name as "const char*", size as "int", deleter_fn as "QMetaType::Deleter",
                 creator_fn as "QMetaType::Creator", destructor_fn as "QMetaType::Destructor",
@@ -81,6 +70,33 @@ fn register_metatype_common<T: QMetaType>(
                 QMetaType::NeedsConstruction | QMetaType::NeedsDestruction | QMetaType::MovableType | extraFlag,
                 metaobject);
         });
+        type_id
+    }
+}
+
+fn register_metatype_common<T: QMetaType>(
+    name: *const std::os::raw::c_char,
+    metaobject: *const QMetaObject,
+    is_enum: bool,
+) -> i32 {
+    use std::any::TypeId;
+    use std::collections::{HashMap, HashSet};
+    use std::ffi::{CStr, CString};
+    use std::sync::Mutex;
+
+    lazy_static! {
+        static ref HASHMAP: Mutex<HashMap<TypeId, (i32, HashSet<CString>)>> =
+            Mutex::new(HashMap::new());
+    };
+
+    let mut h = HASHMAP.lock().unwrap_or_else(|e| e.into_inner());
+    let e = h.entry(TypeId::of::<T>()).or_insert_with(|| {
+        let name = CString::new(format!("{:?}", TypeId::of::<T>())).unwrap();
+        let type_id = if is_enum {
+            helper::regiter_type_enum::<u32>(metaobject, name, true)
+        } else { 
+            helper::regiter_type_enum::<T>(metaobject, name, false)
+        };
 
         if T::CONVERSION_TO_STRING.is_some() {
             extern "C" fn converter_fn<T : QMetaType>(_ : *const c_void, src: &T, dst : *mut QString) -> bool {
@@ -176,7 +192,7 @@ pub fn enum_from_qvariant<T: QEnum + QMetaType>(mut variant: QVariant) -> Option
         None
     } else {
         let raw = unsafe{ *(ptr as *const u32) };
-        T::from_raw_value(raw as u32)
+        T::from_raw_value(raw)
     }
 }
 
