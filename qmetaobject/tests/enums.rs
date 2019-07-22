@@ -49,7 +49,9 @@ struct Store {
     fruit_changed: qt_signal!(),
 
     price_level_of: qt_method!(fn(&self, fruit: products::Fruits) -> PriceLevel),
+    assert_banana: qt_method!(fn(&self, fruit: products::Fruits)),
     assert_apple: qt_method!(fn(&self, fruit: products::Fruits)),
+    assert_peach: qt_method!(fn(&self, fruit: products::Fruits)),
     assert_cheap: qt_method!(fn(&self, level: PriceLevel)),
 }
 
@@ -65,11 +67,27 @@ impl Store {
         price
     }
 
+    fn assert_banana(&self, fruit: products::Fruits) {
+        use products::Fruits;
+        match fruit {
+            Fruits::Banana => {},
+            _ => panic!("Expected a banana")
+        }
+    }
+
     fn assert_apple(&self, fruit: products::Fruits) {
         use products::Fruits;
         match fruit {
             Fruits::Apple => {},
             _ => panic!("Expected an apple")
+        }
+    }
+
+    fn assert_peach(&self, fruit: products::Fruits) {
+        use products::Fruits;
+        match fruit {
+            Fruits::Peach => {},
+            _ => panic!("Expected a peach")
         }
     }
 
@@ -153,7 +171,9 @@ fn calls() {
         "import Business 1.0
         Item {
             function doTest() {
+                _obj.assert_banana(Fruits.Banana);
                 _obj.assert_apple(Fruits.Apple);
+                _obj.assert_peach(Fruits.Peach);
                 _obj.assert_cheap(PriceLevel.Cheap);
 
                 if(_obj.price_level_of(Fruits.Banana) != PriceLevel.Cheap) {
